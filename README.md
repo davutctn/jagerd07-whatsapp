@@ -109,7 +109,7 @@ Uygulamayı tepsi davranışı olmadan çalıştırmak için:
 
 ```bash
 npm start -- --no-tray             # tepsi/arka plan davranışı tamamen kapalı
-WA_MINIMIZE_TO_TRAY=1 npm start   # minimize de tepsiye küçülsün (PROMPT.md davranışı)
+WA_MINIMIZE_TO_TRAY=1 npm start   # minimize de tepsiye küçülsün
 npm start -- --camera              # aramalarda kamera açık başlasın (kalıcı)
 npm start -- --no-camera           # aramalarda kamera kapalı başlasın (kalıcı)
 WA_CAMERA=1 npm start              # yalnızca bu oturumda kamera açık (kalıcı değil)
