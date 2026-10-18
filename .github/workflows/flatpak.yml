@@ -1,0 +1,85 @@
+name: Flatpak
+
+# Her main dalı push'unda:
+#   1) ikonları üret
+#   2) flatpak'i derle
+#   3) .flatpak bundle'ı Release'e yükle (tag varsa) veya artifact olarak sakla
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Flatpak derle (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64]
+
+    steps:
+      - name: Kaynak kodu al
+        uses: actions/checkout@v4
+
+      - name: Araçları kur
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak-builder imagemagick
+
+      - name: Freedesktop SDK kur
+        run: |
+          flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install -y flathub org.freedesktop.Sdk//25.08
+          flatpak install -y flathub org.freedesktop.Platform//25.08
+
+      - name: hicolor ikonlarını üret
+        run: tools/make-flatpak-icons.sh
+
+      - name: Flatpak derle
+        run: |
+          flatpak-builder \
+            --user \
+            --force-clean \
+            --repo=flatpak-repo \
+            .flatpak-build \
+            packaging/flatpak/com.jagerd07.WhatsApp.yml
+
+      - name: Bundle üret
+        run: |
+          flatpak build-bundle flatpak-repo \
+            "com.jagerd07.WhatsApp.flatpak" \
+            com.jagerd07.WhatsApp \
+            --arch=${{ matrix.arch }}
+
+      - name: Özet yazdır
+        run: |
+          {
+            echo "### Flatpak derlendi"
+            echo
+            echo "- app-id: \`com.jagerd07.WhatsApp\`"
+            echo "- branch: \`master\`"
+            echo "- arch: \`${{ matrix.arch }}\`"
+            echo "- boyut: \$(du -h com.jagerd07.WhatsApp.flatpak | cut -f1)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Artifact olarak sakla
+        uses: actions/upload-artifact@v4
+        with:
+          name: com.jagerd07.WhatsApp-flatpak-${{ matrix.arch }}
+          path: com.jagerd07.WhatsApp.flatpak
+          if-no-files-found: error
+
+      # Yalnızca tag ile tetiklendiyse Release'e yükle
+      - name: Release'e yükle
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: com.jagerd07.WhatsApp.flatpak
+          generate_release_notes: true
