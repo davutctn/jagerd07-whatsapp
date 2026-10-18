@@ -34,9 +34,11 @@ Yapımcı: JagerD07 (yalnızca proje meta verisinde)
 
 ```
 .
-├── main.js              # Electron ana süreç (pencere, tray, bildirim, UA)
+├── main.js              # Electron ana süreç (pencere, tray, bildirim, UA, kamera koruması)
 ├── preload.js           # Güvenli contextBridge köprüsü
 ├── package.json         # Bağımlılıklar + electron-builder yapılandırması
+├── LICENSE              # MIT (yalnızca kod)
+├── TRADEMARKS.md        # Marka bildirimi (MIT kapsamında değil)
 ├── assets/
 │   ├── icon.png                 # 512x512 uygulama/AppImage ikonu (WhatsApp logosu)
 │   ├── tray.png                 # 64x64 sistem tepsisi ikonu
@@ -52,7 +54,8 @@ Yapımcı: JagerD07 (yalnızca proje meta verisinde)
 │   └── flatpak/
 │       ├── com.jagerd07.WhatsApp.yml   # flatpak manifesti (runtime 25.08)
 │       └── icons/                       # üretilmiş hicolor ikon boyutları
-└── dist/                # npm run dist / flatpak çıktıları (build sonrası)
+├── .github/workflows/flatpak.yml # her push'ta otomatik flatpak derleme
+└── dist/                # npm run dist / flatpak çıktıları (build sonrası, git'e girmez)
 ```
 
 ## Logo kaynağı
@@ -73,13 +76,43 @@ python3 tools/make_whatsapp_icon.py
 > istemcidir. WhatsApp adı ve logosu WhatsApp Inc.'in tescilli markalarıdır ve
 > yalnızca bu istemcinin WhatsApp Web ile uyumunu göstermek için kullanılır.
 
-## Kurulum / Çalıştırma
+## Kurulum
+
+### Flatpak (önerilen)
+
+[Releases](https://github.com/davutctn/jagerd07-whatsapp/releases) sayfasından
+`.flatpak` dosyasını indirin, sonra:
 
 ```bash
+flatpak install --bundle com.jagerd07.WhatsApp.flatpak
+flatpak run com.jagerd07.WhatsApp
+```
+
+Uygulama menüsünden açılır, tepsi simgesi çalışır.
+
+### Kaynaktan (paketlenmemiş Electron)
+
+```bash
+git clone https://github.com/davutctn/jagerd07-whatsapp.git
+cd jagerd07-whatsapp
 npm install
-npm run setup:desktop   # masaüstü girişi + ikon kaydı (alt-tab ikonu için)
+npm run setup:desktop    # alt-tab ikonu için masaüstü girişi + ikon kurar
 npm start
 ```
+
+### AppImage / tar.gz
+
+```bash
+npm run dist             # -> dist/WhatsApp-1.0.0-x86_64.AppImage
+chmod +x dist/*.AppImage && ./dist/*.AppImage
+```
+
+Elle kurulan paketlerde alt-tab ikonu için bir kez:
+`npm run setup:desktop:appimage`
+
+---
+
+## Yapılandırma
 
 ### Neden `setup:desktop` gerekli?
 
@@ -104,6 +137,8 @@ npm run uninstall:desktop             # geri al
 
 Kurulumdan sonra uygulamayı bir kez kapatıp yeniden açın; alt-tab ikonu
 WhatsApp logosuna döner.
+
+### Çalıştırma seçenekleri
 
 Uygulamayı tepsi davranışı olmadan çalıştırmak için:
 
@@ -197,7 +232,9 @@ WA_DISABLE_GPU=1 npm start  # GPU hızlandırma kapalı (konsol uyarıları tama
 > normal çalışır. Konsolu tamamen sessize almak için
 > `WA_DISABLE_GPU=1 npm start` ile başlatın.
 
-## Flatpak
+---
+
+## Flatpak geliştirme
 
 Flatpak sarmalayıcısı `packaging/flatpak/com.jagerd07.WhatsApp.yml` içindedir.
 Runtime: **org.freedesktop.Platform 25.08** (`org.freedesktop.Sdk//25.08` gerekir).
@@ -210,22 +247,31 @@ flatpak install flathub org.freedesktop.Sdk//25.08
 tools/make-flatpak-icons.sh      # hicolor ikon boyutlarını üretir (bir kez)
 ```
 
-### Derleme ve kurulum
+### Derleme
 
 ```bash
-# Yerel kurulum + çalıştırma
 flatpak-builder --user --install --force-clean \
   .flatpak-build packaging/flatpak/com.jagerd07.WhatsApp.yml
 flatpak run com.jagerd07.WhatsApp
+```
 
-# Dağıtım paketleri (tek dosya bundle + OCI repo)
+Bundle üretmek:
+
+```bash
 flatpak-builder --repo=dist/flatpak-repo --force-clean \
   .flatpak-build packaging/flatpak/com.jagerd07.WhatsApp.yml
 flatpak build-bundle dist/flatpak-repo \
   dist/com.jagerd07.WhatsApp.flatpak com.jagerd07.WhatsApp
+```
 
-# Kurulum
-flatpak install --user --bundle dist/com.jagerd07.WhatsApp.flatpak
+### Otomatik derleme (CI)
+
+`.github/workflows/flatpak.yml` her `main` push'unda flatpak'i derler ve
+artifact olarak saklar. `v*` etiketi push'lanırsa derleme sonucu doğrudan
+GitHub Release'e yüklenir:
+
+```bash
+git tag v1.0.1 && git push origin v1.0.1
 ```
 
 ### Notlar
