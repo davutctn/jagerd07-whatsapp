@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+
+# flatpak-builder çalışma dizinleri
+.flatpak-builder/
+.flatpak-build/

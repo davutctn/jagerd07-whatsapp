@@ -1,0 +1,209 @@
+app-id: com.jagerd07.WhatsApp
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+command: WhatsApp
+
+# flatpak-builder'ın otomatik debuginfo ayırma/strip işlemi Electron'un devasa
+# PIE binary'sini bozuyor: `electron --version` sessizce rc=1 ile sonlanıyor
+# (ikili, sembol hataları nedeniyle çalışmıyor). Bu yüzden strip kapatılır.
+build-options:
+  no-debuginfo: true
+
+finish-args:
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=dri
+  - --share=ipc
+  - --allow=devel
+  - --filesystem=xdg-download
+  - --filesystem=xdg-pictures:ro
+  - --filesystem=xdg-music:ro
+  - --filesystem=xdg-videos:ro
+  - --talk-name=org.freedesktop.Notifications
+  - --env=ELECTRON_OZONE_PLATFORM_HINT=auto
+  - --env=ELECTRON_DISABLE_SECURITY_WARNINGS=1
+  # DİKKAT: LD_LIBRARY_PATH buraya eklenmemeli. Electron, kütüphanelerini
+  # binary'nin yanından ($ORIGIN / RUNPATH) bulur; LD_LIBRARY_PATH tanımlanırsa
+  # /app/lib öncelik kazanır ve "libffmpeg.so: cannot open shared object
+  # file" hatasıyla uygulama sessizce sonlanır./electron
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /share/man
+  - /share/doc
+  - '*.a'
+  - '*.la'
+
+modules:
+  # ---------------------------------------------------------------------
+  # Electron çalıştırma zamanı
+  #
+  # Flathub'da resmî bir Electron base runtime yok ve freedesktop 25.08
+  # SDK'i Node.js içermiyor; bu yüzden Electron'un resmi prebuilt paketi
+  # indirilip /app'e yerleştiriliyor.
+  # ---------------------------------------------------------------------
+  - name: electron
+    buildsystem: simple
+    # İndirme flatpak-builder tarafından, build sandbox'ının DIŞINDA (host
+    # tarafında) yapılır; build komutları ağ erişimi olmadan çalışır.
+    sources:
+      - type: archive
+        url: https://github.com/electron/electron/releases/download/v28.3.3/electron-v28.3.3-linux-x64.zip
+        sha256: 20f6be493cbd6c9924206e744b1c490af1f97f4735451b9dc19f0d305366d546
+        strip-components: 0
+        dest: electron-src
+    build-commands:
+      - |
+        set -eu
+        mkdir -p /app/electron
+        cp -a electron-src/. /app/electron/
+        chmod +x /app/electron/electron
+        # NOT: resources/default_app.asar SİLİNMEMELİ. Electron başlarken bu
+        # dosyayı bekliyor; silinirse "electron --version" sessizce rc=1 ile
+        # sonlanıyor ve uygulama hiç açılmıyor.
+
+  # ---------------------------------------------------------------------
+  # Uygulama kaynakları (node_modules GEREKMEZ)
+  #
+  # Uygulama saf Electron ana sürecidir; derleme adımı yoktur.
+  # ---------------------------------------------------------------------
+  - name: whatsapp
+    buildsystem: simple
+    sources:
+      - type: file
+        path: ../../main.js
+        dest: app
+      - type: file
+        path: ../../preload.js
+        dest: app
+      - type: file
+        path: ../../package.json
+        dest: app
+      - type: dir
+        path: ../../assets
+        dest: app/assets
+        skip:
+          - whatsapp.ico
+          - whatsapp-logo-source.png
+    build-commands:
+      - |
+        set -eu
+        # Kaynaklar build dizininde (app/), /app ayrı bir install prefix'i.
+        mkdir -p /app/app
+        cp -a app/. /app/app/
+
+      - |
+        set -eu
+        # package.json içindeki geliştirme bağımlılıkları ve build betikleri
+        # flatpak'a gerekli değil; çalıştırma sırasında npm çalıştırılmıyor.
+        python3 - <<'PY'
+        import json
+        p = '/app/app/package.json'
+        d = json.load(open(p))
+        d.pop('devDependencies', None)
+        d.pop('scripts', None)
+        d.pop('build', None)
+        d['main'] = 'main.js'
+        json.dump(d, open(p, 'w'), indent=2)
+        PY
+        chmod 644 /app/app/*.js /app/app/package.json
+
+  # ---------------------------------------------------------------------
+  # Masaüstü girişi + ikon
+  #
+  # NOT: Electron uygulamalarında StartupWMClass, pencerenin WM_CLASS
+  # değeriyle BİREBİR aynı olmalıdır. main.js içinde
+  # `app.setName('WhatsApp')` çağrıldığı için WM_CLASS = "WhatsApp".
+  # ---------------------------------------------------------------------
+  - name: desktop-and-icons
+    buildsystem: simple
+    # İkon boyutları build ÖNCESİNDE tools/make-flatpak-icons.sh ile üretilir;
+    # freedesktop SDK'ta ImageMagick/Pillow bulunmadığı için burada yalnızca
+    # kopyalanır.
+    sources:
+      - type: dir
+        path: icons
+    build-commands:
+      - |
+        set -eu
+        for s in 16 24 32 48 64 128 256 512; do
+          install -d "/app/share/icons/hicolor/${s}x${s}/apps"
+          install -m 644 "com.jagerd07.WhatsApp-${s}.png" \
+            "/app/share/icons/hicolor/${s}x${s}/apps/com.jagerd07.WhatsApp.png"
+        done
+
+      - |
+        set -eu
+        install -d /app/share/applications
+        cat > /app/share/applications/com.jagerd07.WhatsApp.desktop <<'DESKTOP'
+        [Desktop Entry]
+        Type=Application
+        Name=WhatsApp
+        GenericName=Instant Messenger
+        Comment=WhatsApp Web masaüstü istemcisi (resmî olmayan)
+        Exec=WhatsApp %U
+        Icon=com.jagerd07.WhatsApp
+        Terminal=false
+        StartupNotify=true
+        StartupWMClass=com.jagerd07.WhatsApp
+        Categories=Network;InstantMessaging;Chat;
+        Keywords=whatsapp;chat;messenger;
+        MimeType=x-scheme-handler/whatsapp;
+        DESKTOP
+
+      - |
+        set -eu
+        install -d /app/share/metainfo
+        cat > /app/share/metainfo/com.jagerd07.WhatsApp.metainfo.xml <<'METAINFO'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <component type="desktop-application">
+          <id>com.jagerd07.WhatsApp</id>
+          <metadata_license>CC0-1.0</metadata_license>
+          <project_license>MIT</project_license>
+          <name>WhatsApp</name>
+          <summary>WhatsApp Web masaüstü istemcisi</summary>
+          <description>
+            <p>
+              web.whatsapp.com adresini Electron tabanlı bir pencerede açan
+              masaüstü istemcisi. Sistem tepsisi, yerel bildirimler, sesli ve
+              görüntülü arama ile dosya indirme desteği sunar.
+            </p>
+            <p>Resmî olmayan bir istemcidir; WhatsApp Inc. ile ilişkili değildir.</p>
+          </description>
+          <launchable type="desktop-id">com.jagerd07.WhatsApp.desktop</launchable>
+          <url type="homepage">https://github.com/jagerd07/jagerd07-whatsapp</url>
+          <provides>
+            <binary>WhatsApp</binary>
+          </provides>
+          <categories>
+            <category>Network</category>
+            <category>InstantMessaging</category>
+          </categories>
+          <content_rating type="oars-1.1"/>
+        </component>
+        METAINFO
+
+      - |
+        set -eu
+        install -d /app/bin
+        cat > /app/bin/WhatsApp <<'LAUNCHER'
+        #!/bin/sh
+        # Electron, flatpak sandbox'ında kendi kullanıcı-namespace sandbox'ını
+        # açamaz; flatpak kendi sandbox'ını zaten uyguluyor.
+        #
+        # --class BURAYA verilmez: flatpak Wayland alt-tab ikonu, uygulamanın
+        # app_id'sinden (com.jagerd07.WhatsApp) bulunur; bu değer main.js'deki
+        # app.setDesktopName() ile ayarlanır. --class=WhatsApp verilirse
+        # WM_CLASS "WhatsApp" olur ve flatpak'ın com.jagerd07.WhatsApp.desktop
+        # girişiyle eşleşmez.
+        exec /app/electron/electron \
+          --app=/app/app \
+          --no-sandbox \
+          --disable-gpu-sandbox \
+          "$@"
+        LAUNCHER
+        chmod +x /app/bin/WhatsApp

@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=WhatsApp
+GenericName=Instant Messenger
+Comment=WhatsApp Web masaüstü istemcisi (resmî olmayan uygulama)
+Exec=@EXEC@
+Icon=whatsapp
+Terminal=false
+StartupNotify=true
+StartupWMClass=WhatsApp
+Categories=Network;InstantMessaging;Chat;
+Keywords=whatsapp;chat;messenger;whatsapp web;
+MimeType=x-scheme-handler/whatsapp;
+X-GNOME-UsesNotifications=true

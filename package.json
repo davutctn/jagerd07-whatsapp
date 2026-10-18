@@ -1,0 +1,98 @@
+{
+  "name": "whatsapp-linux-desktop",
+  "version": "1.0.0",
+  "description": "WhatsApp Web masaüstü istemcisi (resmî olmayan)",
+  "main": "main.js",
+  "author": {
+    "name": "JagerD07",
+    "email": "jagerd07@example.com"
+  },
+  "homepage": "https://github.com/jagerd07/jagerd07-whatsapp",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --linux AppImage tar.gz",
+    "dist:all": "electron-builder --linux",
+    "setup:desktop": "tools/install-desktop.sh",
+    "setup:desktop:appimage": "tools/install-desktop.sh --exe dist/linux-unpacked/WhatsApp",
+    "uninstall:desktop": "tools/install-desktop.sh --uninstall"
+  },
+  "keywords": [
+    "whatsapp",
+    "electron",
+    "linux",
+    "desktop",
+    "jagerd07"
+  ],
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.whatsapp.desktop",
+    "productName": "WhatsApp",
+    "copyright": "Copyright (c) 2026 JagerD07",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!*.md",
+      "!assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": [
+          "**/*.png"
+        ]
+      }
+    ],
+    "extraMetadata": {
+      "main": "main.js"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Network;InstantMessaging;Chat",
+      "synopsis": "WhatsApp Web masaüstü istemcisi",
+      "description": "Tüm Linux dağıtımlarında çalışan, sistem tepsisi ve yerel bildirim destekli WhatsApp Web masaüstü istemcisi (resmî olmayan uygulama).",
+      "desktop": {
+        "Name": "WhatsApp",
+        "GenericName": "Instant Messenger",
+        "Comment": "WhatsApp Web masaüstü istemcisi (resmî olmayan)",
+        "Categories": "Network;InstantMessaging;Chat;",
+        "StartupWMClass": "WhatsApp",
+        "MimeType": "x-scheme-handler/whatsapp;"
+      },
+      "executableName": "WhatsApp",
+      "mimeTypes": [
+        "x-scheme-handler/whatsapp"
+      ]
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}-${arch}.AppImage"
+    },
+    "npmRebuild": false,
+    "compression": "maximum"
+  }
+}
